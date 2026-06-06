@@ -442,14 +442,29 @@ class CitiesSeeder extends Seeder
             ['name' => 'Лулео', 'name_en' => 'lulea', 'lat' => 65.5848, 'lng' => 22.1547, 'country' => 'Швеция', 'country_code' => 'SE', 'population' => 78045],
         ];
 
+        // Столицы европейских государств
+        $capitals = [
+            'Москва', 'Берлин', 'Париж', 'Лондон', 'Рим', 'Мадрид',
+            'Варшава', 'Киев', 'Амстердам', 'Брюссель', 'Берн', 'Вена',
+            'Стокгольм', 'Осло', 'Копенгаген', 'Хельсинки', 'Бухарест',
+            'Будапешт', 'Прага', 'Братислава', 'Минск', 'Лиссабон',
+            'Афины', 'София', 'Белград', 'Загреб', 'Любляна', 'Таллин',
+            'Рига', 'Вильнюс', 'Кишинёв', 'Дублин', 'Рейкьявик',
+            'Люксембург', 'Валлетта', 'Никосия', 'Скопье', 'Тирана',
+            'Приштина', 'Подгорица', 'Сараево', 'Андорра-ла-Велья',
+            'Монако', 'Сан-Марино', 'Вадуц',
+        ];
+        $capitalsSet = array_flip($capitals);
+
         // Filter out placeholder entries
         $cities = array_filter($cities, fn($c) => $c['lat'] != 0 && $c['name_en'] != '');
 
-        // Deduplicate by name_en
+        // Deduplicate by Russian name, add is_capital flag
         $unique = [];
         foreach ($cities as $city) {
             $key = mb_strtolower($city['name']);
             if (!isset($unique[$key])) {
+                $city['is_capital'] = isset($capitalsSet[$city['name']]) ? 1 : 0;
                 $unique[$key] = $city;
             }
         }

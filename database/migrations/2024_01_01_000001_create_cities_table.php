@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('country');
             $table->string('country_code', 2);
             $table->integer('population')->default(0);
+            $table->boolean('is_capital')->default(false);
         });
     }
 

@@ -9,7 +9,7 @@ class CityController extends Controller
 {
     public function index(): JsonResponse
     {
-        $cities = City::select('id', 'name', 'name_en', 'lat', 'lng', 'country', 'country_code', 'population')
+        $cities = City::select('id', 'name', 'name_en', 'lat', 'lng', 'country', 'country_code', 'population', 'is_capital')
             ->orderBy('population', 'desc')
             ->get();
 

@@ -8,5 +8,7 @@ class City extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['name', 'name_en', 'lat', 'lng', 'country', 'country_code', 'population'];
+    protected $fillable = ['name', 'name_en', 'lat', 'lng', 'country', 'country_code', 'population', 'is_capital'];
+
+    protected $casts = ['is_capital' => 'boolean'];
 }

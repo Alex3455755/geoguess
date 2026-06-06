@@ -74,10 +74,89 @@
           <div>Процент: <strong>{{ Math.round((found.length / Math.max(totalCities, 1)) * 100) }}%</strong></div>
         </div>
         <div class="result-grade" :class="gradeClass">{{ grade }}</div>
+
+        <!-- Детальная статистика -->
+        <div class="detail-stats">
+          <div class="detail-stat-row">
+            <div class="detail-stat-icon">👑</div>
+            <div class="detail-stat-body">
+              <div class="detail-stat-label">Столицы</div>
+              <div class="detail-stat-bar-wrap">
+                <div class="detail-stat-bar" :style="{ width: (foundCapitals / Math.max(totalCapitals,1) * 100) + '%', background: '#f59e0b' }"></div>
+              </div>
+            </div>
+            <div class="detail-stat-value">
+              <strong>{{ foundCapitals }}</strong><span class="of-total"> / {{ totalCapitals }}</span>
+            </div>
+          </div>
+
+          <div class="detail-stat-row">
+            <div class="detail-stat-icon">🏙️</div>
+            <div class="detail-stat-body">
+              <div class="detail-stat-label">Города-миллионники</div>
+              <div class="detail-stat-bar-wrap">
+                <div class="detail-stat-bar" :style="{ width: (foundMillionaires / Math.max(totalMillionaires,1) * 100) + '%', background: '#60a5fa' }"></div>
+              </div>
+            </div>
+            <div class="detail-stat-value">
+              <strong>{{ foundMillionaires }}</strong><span class="of-total"> / {{ totalMillionaires }}</span>
+            </div>
+          </div>
+
+          <div class="detail-stat-row">
+            <div class="detail-stat-icon">👥</div>
+            <div class="detail-stat-body">
+              <div class="detail-stat-label">Охват населения</div>
+              <div class="detail-stat-bar-wrap">
+                <div class="detail-stat-bar" :style="{ width: populationPct + '%', background: '#4ade80' }"></div>
+              </div>
+              <div class="detail-stat-sub">{{ formatPop(foundPopulation) }} из {{ formatPop(totalPopulation) }}</div>
+            </div>
+            <div class="detail-stat-value">
+              <strong>{{ populationPct }}%</strong>
+            </div>
+          </div>
+        </div>
         <button @click="resetGame" class="start-btn">🔄 Играть снова</button>
-        <button @click="showMissed = !showMissed" class="show-missed-btn">
-          {{ showMissed ? 'Скрыть' : 'Показать' }} пропущенные города
-        </button>
+
+        <div class="toggle-buttons">
+          <button @click="showCountryStats = !showCountryStats" class="toggle-btn" :class="{ active: showCountryStats }">
+            🌍 По странам
+          </button>
+          <button @click="showMissed = !showMissed" class="toggle-btn" :class="{ active: showMissed }">
+            📍 Пропущенные
+          </button>
+        </div>
+      </div>
+
+      <!-- Country stats -->
+      <div class="country-stats-list" v-if="gameState === 'finished' && showCountryStats">
+        <div class="section-title">Статистика по странам</div>
+        <div
+          v-for="s in countryStats"
+          :key="s.code"
+          class="country-stat-row"
+          :class="{ 'country-zero': s.found === 0 }"
+        >
+          <span class="country-flag">{{ getFlagEmoji(s.code) }}</span>
+          <div class="country-stat-body">
+            <div class="country-stat-header">
+              <span class="country-stat-name">{{ s.name }}</span>
+              <span class="country-stat-count" :style="{ color: s.found > 0 ? getCountryColor(s.code) : '#555' }">
+                {{ s.found }}<span class="of-total"> / {{ s.total }}</span>
+              </span>
+            </div>
+            <div class="country-stat-bar-wrap">
+              <div
+                class="country-stat-bar"
+                :style="{
+                  width: (s.found / s.total * 100) + '%',
+                  background: getCountryColor(s.code)
+                }"
+              ></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Missed cities list -->
@@ -169,6 +248,7 @@ export default {
       selectedMode: 600,
       modes: MODES,
       showMissed: false,
+      showCountryStats: false,
     };
   },
 
@@ -183,6 +263,50 @@ export default {
     missedCities() {
       return this.allCities.filter(c => !this.foundIds.has(c.id));
     },
+
+    // ---- Post-game stats ----
+    totalCapitals() {
+      return this.allCities.filter(c => c.is_capital).length;
+    },
+    foundCapitals() {
+      return this.found.filter(c => c.is_capital).length;
+    },
+    totalMillionaires() {
+      return this.allCities.filter(c => c.population >= 1000000).length;
+    },
+    foundMillionaires() {
+      return this.found.filter(c => c.population >= 1000000).length;
+    },
+    totalPopulation() {
+      return this.allCities.reduce((s, c) => s + (c.population || 0), 0);
+    },
+    foundPopulation() {
+      return this.found.reduce((s, c) => s + (c.population || 0), 0);
+    },
+    populationPct() {
+      if (!this.totalPopulation) return 0;
+      return ((this.foundPopulation / this.totalPopulation) * 100).toFixed(1);
+    },
+
+    countryStats() {
+      // Build a map: country_code → { name, code, total, found }
+      const map = {};
+      for (const city of this.allCities) {
+        const k = city.country_code;
+        if (!map[k]) map[k] = { name: city.country, code: k, total: 0, found: 0 };
+        map[k].total++;
+      }
+      for (const city of this.found) {
+        if (map[city.country_code]) map[city.country_code].found++;
+      }
+      return Object.values(map)
+        .sort((a, b) => {
+          // Countries with at least one found city first, sorted by found desc
+          if (b.found !== a.found) return b.found - a.found;
+          return b.total - a.total;
+        });
+    },
+
     grade() {
       const pct = (this.found.length / Math.max(this.totalCities, 1)) * 100;
       if (pct >= 80) return '🏆 Отлично!';
@@ -271,6 +395,7 @@ export default {
       this.timeLeft = this.selectedMode;
       this.gameState = 'playing';
       this.showMissed = false;
+      this.showCountryStats = false;
       this.$nextTick(() => {
         this.$refs.cityInput?.focus();
         this.startTimer();
@@ -374,28 +499,28 @@ export default {
       }, 2000);
     },
 
-    markerSize(population) {
-      if (!population) return 7;
-      // Logarithmic scale: 50k → 7px, 500k → 11px, 3M → 16px, 10M+ → 22px
-      const size = Math.round(4 + Math.log10(Math.max(population, 50000)) * 3.6);
-      return Math.min(Math.max(size, 7), 22);
+    markerRadius(population) {
+      // Logarithmic scale: radius in pixels
+      // 50k → 4, 500k → 7, 3M → 10, 10M+ → 13
+      if (!population) return 4;
+      const r = Math.round(1.5 + Math.log10(Math.max(population, 50000)) * 2.0);
+      return Math.min(Math.max(r, 4), 13);
     },
 
     addMarker(city, faded = false) {
       if (this.markers[city.id]) return;
 
       const color = faded ? '#888' : this.getCountryColor(city.country_code);
-      const size = this.markerSize(city.population);
-      const half = Math.round(size / 2);
+      const radius = this.markerRadius(city.population);
 
-      const icon = L.divIcon({
-        className: '',
-        html: `<div class="city-dot ${faded ? 'city-dot-missed' : 'city-dot-found'}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
-        iconSize: [size, size],
-        iconAnchor: [half, half],
-      });
-
-      const marker = L.marker([city.lat, city.lng], { icon })
+      const marker = L.circleMarker([city.lat, city.lng], {
+        radius,
+        fillColor: color,
+        fillOpacity: faded ? 0.3 : 0.85,
+        color: faded ? '#555' : 'rgba(255,255,255,0.75)',
+        weight: faded ? 0.5 : 1.5,
+        opacity: faded ? 0.5 : 1,
+      })
         .addTo(this.map)
         .bindPopup(`
           <div class="popup-content">
@@ -404,6 +529,14 @@ export default {
             ${city.population ? `<br><small>👥 ${this.formatPop(city.population)}</small>` : ''}
           </div>
         `, { maxWidth: 200 });
+
+      // Pop-in animation: briefly boost radius then settle
+      if (!faded) {
+        const big = radius * 2.2;
+        marker.setRadius(big);
+        setTimeout(() => marker.setRadius(radius * 1.1), 120);
+        setTimeout(() => marker.setRadius(radius), 250);
+      }
 
       this.markers[city.id] = marker;
     },
@@ -475,28 +608,34 @@ body {
 
 /* ---- Sidebar ---- */
 .sidebar {
-  width: 320px;
-  min-width: 280px;
+  width: 330px;
+  min-width: 290px;
   background: #16213e;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding: 16px;
-  gap: 12px;
+  padding: 18px 16px;
+  gap: 14px;
   border-right: 1px solid #0f3460;
   z-index: 10;
+}
+
+.sidebar-header {
+  padding-bottom: 2px;
 }
 
 .sidebar-header h1 {
   font-size: 1.3rem;
   font-weight: 700;
   color: #e94560;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
   font-size: 0.78rem;
   color: #aaa;
-  margin-top: 4px;
+  margin-top: 5px;
+  line-height: 1.4;
 }
 
 /* Stats */
@@ -508,8 +647,8 @@ body {
 .stat-box {
   flex: 1;
   background: #0f3460;
-  border-radius: 8px;
-  padding: 8px 4px;
+  border-radius: 10px;
+  padding: 10px 4px;
   text-align: center;
 }
 
@@ -637,24 +776,173 @@ body {
 .grade-bronze { color: #d97706; }
 .grade-normal { color: #60a5fa; }
 
-.show-missed-btn {
+/* Detail stats block */
+.detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #0f3460;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.detail-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-stat-icon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.detail-stat-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-stat-label {
+  font-size: 0.72rem;
+  color: #aaa;
+  margin-bottom: 3px;
+}
+
+.detail-stat-bar-wrap {
+  height: 6px;
+  background: #1a3a6a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.detail-stat-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s ease;
+}
+
+.detail-stat-sub {
+  font-size: 0.65rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+.detail-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 48px;
+}
+
+.of-total {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #888;
+}
+
+/* Toggle buttons row */
+.toggle-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-btn {
+  flex: 1;
   background: #0f3460;
   border: 1px solid #1e4d8c;
   border-radius: 8px;
-  padding: 8px;
+  padding: 7px 6px;
   color: #aaa;
   cursor: pointer;
-  width: 100%;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   transition: all 0.2s;
-  margin-top: -4px;
+  text-align: center;
 }
-.show-missed-btn:hover { border-color: #e94560; color: #eee; }
+.toggle-btn:hover { border-color: #e94560; color: #eee; }
+.toggle-btn.active { background: #1e3a6a; border-color: #e94560; color: #eee; }
+
+/* Country stats */
+.section-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.country-stats-list {
+  border-top: 1px solid #0f3460;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.country-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.country-zero { opacity: 0.4; }
+
+.country-flag {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+}
+
+.country-stat-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.country-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+
+.country-stat-name {
+  font-size: 0.8rem;
+  color: #d1d5db;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.country-stat-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.country-stat-bar-wrap {
+  height: 4px;
+  background: #1a3a6a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.country-stat-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
 
 /* Found / Missed lists */
 .found-list, .missed-list {
   border-top: 1px solid #0f3460;
-  padding-top: 8px;
+  padding-top: 10px;
   max-height: 250px;
   overflow-y: auto;
 }
@@ -717,28 +1005,9 @@ body {
   height: 100%;
 }
 
-/* Markers */
-.city-dot {
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.7);
-  box-shadow: 0 0 6px rgba(0,0,0,0.6);
-  transition: transform 0.2s;
-}
-
-.city-dot-found {
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
-  animation: pop 0.4s ease-out;
-}
-
-.city-dot-missed {
-  opacity: 0.45;
-  border-color: #666;
-}
-
-@keyframes pop {
-  0% { transform: scale(0); }
-  70% { transform: scale(1.4); }
-  100% { transform: scale(1); }
+/* Leaflet circleMarker hover */
+.leaflet-interactive:hover {
+  cursor: pointer;
 }
 
 /* Leaflet popup */

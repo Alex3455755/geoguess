@@ -1,0 +1,2 @@
+/* Global styles — component styles are in App.vue */
+html, body { height: 100%; overflow: hidden; }

@@ -104,10 +104,14 @@
           v-for="city in [...found].reverse().slice(0, 20)"
           :key="city.id"
           class="found-city"
+          :style="{ borderLeftColor: getCountryColor(city.country_code) }"
           @click="flyToCity(city)"
         >
           <span class="flag">{{ getFlagEmoji(city.country_code) }}</span>
-          {{ city.name }}
+          <span class="city-name-text">{{ city.name }}</span>
+          <span class="city-pop-badge" :style="{ background: getCountryColor(city.country_code) + '33', color: getCountryColor(city.country_code) }">
+            {{ formatPop(city.population) }}
+          </span>
         </div>
       </div>
 
@@ -214,9 +218,10 @@ export default {
         maxZoom: 12,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap contributors, © CARTO',
         maxZoom: 19,
+        subdomains: 'abcd',
       }).addTo(this.map);
 
       // Europe bounds
@@ -230,7 +235,7 @@ export default {
     async loadCities() {
       this.loading = true;
       try {
-        const { data } = await axios.get('/api/cities');
+        const { data } = await axios.get('api/cities');
         this.allCities = data;
         this.citiesMap = {};
         data.forEach(city => {
@@ -369,16 +374,25 @@ export default {
       }, 2000);
     },
 
+    markerSize(population) {
+      if (!population) return 7;
+      // Logarithmic scale: 50k → 7px, 500k → 11px, 3M → 16px, 10M+ → 22px
+      const size = Math.round(4 + Math.log10(Math.max(population, 50000)) * 3.6);
+      return Math.min(Math.max(size, 7), 22);
+    },
+
     addMarker(city, faded = false) {
       if (this.markers[city.id]) return;
 
-      const color = faded ? '#999' : this.getCountryColor(city.country_code);
+      const color = faded ? '#888' : this.getCountryColor(city.country_code);
+      const size = this.markerSize(city.population);
+      const half = Math.round(size / 2);
 
       const icon = L.divIcon({
         className: '',
-        html: `<div class="city-dot ${faded ? 'city-dot-missed' : 'city-dot-found'}" style="background:${color}"></div>`,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
+        html: `<div class="city-dot ${faded ? 'city-dot-missed' : 'city-dot-found'}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
+        iconSize: [size, size],
+        iconAnchor: [half, half],
       });
 
       const marker = L.marker([city.lat, city.lng], { icon })
@@ -653,7 +667,7 @@ body {
 }
 
 .found-city, .missed-city {
-  padding: 4px 6px;
+  padding: 4px 6px 4px 10px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
@@ -661,9 +675,18 @@ body {
   align-items: center;
   gap: 6px;
   transition: background 0.15s;
+  border-left: 3px solid transparent;
 }
 .found-city:hover { background: #0f3460; }
-.found-city { color: #4ade80; }
+.found-city { color: #e2e8f0; }
+.city-name-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.city-pop-badge {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .missed-city { color: #9ca3af; }
 .missed-city:hover { background: #0f3460; color: #eee; }
 .missed-city small { margin-left: auto; font-size: 0.7rem; color: #666; }
@@ -696,11 +719,9 @@ body {
 
 /* Markers */
 .city-dot {
-  width: 10px;
-  height: 10px;
   border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  border: 2px solid rgba(255,255,255,0.7);
+  box-shadow: 0 0 6px rgba(0,0,0,0.6);
   transition: transform 0.2s;
 }
 

@@ -9,6 +9,10 @@ window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
+// Base URL for API — works in both /geoguess/public/ and / setups
+const base = import.meta.env.VITE_APP_BASE ?? '/';
+window.axios.defaults.baseURL = base;
+
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
  * for events that are broadcast by Laravel. Echo and event broadcasting
